@@ -1,15 +1,64 @@
-group 'svarzee.gps'
-version '0.3.0'
+buildscript {
+    repositories {
+        mavenCentral()
+        jcenter()
+    }
+    dependencies {
+        classpath "com.jfrog.bintray.gradle:gradle-bintray-plugin:1.7.1"
+    }
+}
+
+group = "svarzee.gps"
+version = "0.3"
 
 apply plugin: 'java'
 apply plugin: 'groovy'
 apply plugin: 'checkstyle'
+apply plugin: 'maven-publish'
+apply plugin: 'com.jfrog.bintray'
+apply plugin: 'maven'
+
+task createPom << {
+    pom {
+        project {
+            groupId 'svarzee.gps'
+            artifactId 'gps'
+            version '0.3.0-2'
+
+            inceptionYear '2008'
+            licenses {
+                license {
+                    name 'The Apache Software License, Version 2.0'
+                    url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                    distribution 'repo'
+                }
+            }
+        }
+    }.writeTo("pom.xml")
+}
 
 sourceCompatibility = 1.7
 
 repositories {
     mavenCentral()
 }
+
+task bundle(type: Jar) {
+    baseName = project.name + '-all'
+    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    with jar
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+        }
+    }
+}
+
+
+jar.finalizedBy(bundle)
 
 dependencies {
     compile "com.squareup.okhttp3:okhttp:3.4.1"
@@ -20,4 +69,41 @@ dependencies {
 
 checkstyle {
     toolVersion = '7.0'
+}
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+    classifier = 'sources'
+    from sourceSets.main.allJava
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    javadoc.failOnError(false);
+    javadoc.source = sourceSets.main.allJava
+    from javadoc.destinationDir
+}
+
+artifacts {
+    archives sourcesJar
+    //archives javadocJar
+}
+
+Properties properties = new Properties()
+try {
+    properties.load(project.rootProject.file('local.properties').newDataInputStream())
+} catch (Exception ignore) {
+}
+
+bintray {
+    user = properties.getProperty('user')
+    key =  properties.getProperty('apiKey')
+    configurations = ['archives']
+    pkg {
+        repo = 'maven'
+        name = 'gps'
+        userOrg = user
+        licenses = ['Apache-2.0']
+        vcsUrl = 'https://github.com/FabianTerhorst/gpsoauth-java.git'
+        publish = true
+    }
 }
